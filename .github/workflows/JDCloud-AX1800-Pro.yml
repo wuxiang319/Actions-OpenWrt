@@ -72,7 +72,12 @@ jobs:
     - name: 清理磁盘空间(Ubuntu)
       uses: jlumbroso/free-disk-space@main
       with:
+        # this might remove tools that are actually needed,
+        # when set to "true" but frees about 6 GB
         tool-cache: true
+        
+        # all of these default to true, but feel free to set to
+        # "false" if necessary for your workflow
         android: false
         dotnet: false
         haskell: false
@@ -188,16 +193,30 @@ jobs:
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        RELEASE_VERSION="v${{ github.run_number }}"
-        echo "release_tag=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+        touch release.txt
+        echo "- 使用源码：${{ env.REPO_URL }}" >> release.txt
+        echo "- 登录地址：${{ env.IP_ADDR }}" >> release.txt
+        echo "- 注意AX1800规格的5G无线不支持160MHz频宽" >> release.txt
+        if [[ "${{ env.SHOW_TEMP }}" == '-show_temp' ]]; then
+                echo "- 显示CPU状态和无线温度" >> release.txt
+        else
+                echo "- 不显示CPU状态和无线温度" >> release.txt
+        fi
+        if [[ "${{ env.BUILD_DOCKERMAN }}" == '-docker' ]]; then
+                echo "- 已编译luci-app-dockerman" >> release.txt
+        else
+                echo "- 未编译luci-app-dockerman" >> release.txt
+        fi
+        echo "release_tag=${{ env.FILE_DATE }}-${{ env.OPENWRT_NAME }}-${{ env.DEVICE_NAME }}${{ env.BUILD_DOCKERMAN }}" >> $GITHUB_OUTPUT
+        echo "status=success" >> $GITHUB_OUTPUT
         
     - name: 发布固件至Release
       uses: softprops/action-gh-release@master
-      if: steps.tag.outputs.release_tag && !cancelled()
+      if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         files: ${{ env.FIRMWARE }}/*
-        name: ${{ steps.tag.outputs.release_tag }}
+        name: ${{ env.FILE_DATE }}-${{ env.OPENWRT_NAME }}-${{ env.DEVICE_NAME }}${{ env.BUILD_DOCKERMAN }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
